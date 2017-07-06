@@ -3,6 +3,7 @@
 
 import numpy as np
 import random, pygame, sys, operator, os, time, argparse
+import keras.utils
 from pygame.locals import *
 
 FPS = 10
@@ -62,9 +63,22 @@ def main():
 
 
 class Game():
+
+    def render(self):
+        global FPSCLOCK, DISPLAYSURF, BASICFONT
+        if self.firstCall:
+            self.firstCall = False
+            pygame.init()
+            FPSCLOCK = pygame.time.Clock()
+            DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+            BASICFONT = pygame.font.Font('freesansbold.ttf', 18)
+            pygame.display.set_caption('CNN Snake')
+        updateDisplay(self)
+
     def __init__(self):
-        self.observation_space = np.zeros((CELLWIDTH,CELLHEIGHT))
+        self.observation_space = np.zeros((CELLWIDTH + 2,CELLHEIGHT + 2))
         self.action_space = 4
+        self.firstCall = True
 
     def __getattr__(self, name):
         if hasattr(self.st, name):
@@ -95,28 +109,28 @@ class Game():
         assert not self.gameOver, "Game over!"
         appleReward = 10
         deathReward = -50
-        moveReward = -0.2
+        moveReward = 1
         reward = 0
-        wormCoords = self.wormCoords
         apple = self.apple
-        newHead = findNewHead(action, wormCoords)
-        if wormCoords[HEAD]['x'] == -1 or wormCoords[HEAD]['x'] == CELLWIDTH or wormCoords[HEAD]['y'] == -1 or wormCoords[HEAD]['y'] == CELLHEIGHT:
+        newHead = findNewHead(action, self.wormCoords)
+        self.wormCoords.insert(0, newHead)
+        if self.wormCoords[HEAD]['x'] == -1 or self.wormCoords[HEAD]['x'] == CELLWIDTH or self.wormCoords[HEAD]['y'] == -1 or self.wormCoords[HEAD]['y'] == CELLHEIGHT:
             self.gameOver = True
             reward = deathReward
 
-        for wormBody in wormCoords[1:]:
-            if wormBody['x'] == wormCoords[HEAD]['x'] and wormBody['y'] == wormCoords[HEAD]['y']:
+        for wormBody in self.wormCoords[1:]:
+            if wormBody['x'] == self.wormCoords[HEAD]['x'] and wormBody['y'] == self.wormCoords[HEAD]['y']:
                 self.gameOver = True
                 reward = deathReward
+        
+        #if didn't die, move snake
         if not self.gameOver:
-            if wormCoords[HEAD]['x'] == apple['x'] and wormCoords[HEAD]['y'] == apple['y']:
-                self.apple = getRandomLocation(wormCoords) # set a new apple somewhere
+            if self.wormCoords[HEAD]['x'] == apple['x'] and self.wormCoords[HEAD]['y'] == apple['y']:
+                self.apple = getRandomLocation(self.wormCoords) # set a new apple somewhere
                 reward = appleReward
             else:
                 self.wormCoords.pop() # remove worm's tail segment
                 reward = moveReward
-        #print("new head {}".format(newHead))
-        self.wormCoords.insert(0, newHead)
         self.score = self.score + reward
         return (self.get_state_map(),reward,self.gameOver,self.score)
 
@@ -127,15 +141,29 @@ class Game():
         return self.score
 
     def get_state_map(self):
-        stateMap = [[0 for i in range(CELLWIDTH)] for j in range(CELLHEIGHT)]
+        stateMap = [[0 for i in range(CELLWIDTH + 2)] for j in range(CELLHEIGHT + 2)]
+        #print("\n \n")
         for i, cell in enumerate(self.wormCoords):
-            print(cell)  #this goes to 10
-            stateMap[cell['y']][cell['x']] = 1
+            #print(cell)  #this goes to 10
+            stateMap[cell['y'] + 1][cell['x'] + 1] = 1
             #mark head as 2
-            if i == len(self.wormCoords):
-                stateMap[cell['y']][cell['x']] = 2
-        stateMap[self.apple['y']][self.apple['x']] = 3
-        return np.array(stateMap).reshape(1,1,self.observation_space.shape[0],self.observation_space.shape[1])
+            if i == 0:
+                stateMap[cell['y'] + 1][cell['x'] + 1] = 2
+        stateMap[self.apple['y'] + 1][self.apple['x'] + 1] = 3
+        categorical_2d_map = np.array(stateMap)
+
+        one_hot_3d_map = keras.utils.to_categorical(categorical_2d_map.reshape((CELLWIDTH + 2) * (CELLHEIGHT + 2)), num_classes = 4)
+        one_hot_4d_map = one_hot_3d_map.reshape(1,CELLWIDTH+2,CELLHEIGHT+2,4)
+        return one_hot_4d_map
+        # print(categorical_2d_map)
+        # print("\n")        
+        # print(categorical_2d_map.reshape(1,(CELLWIDTH + 2) * (CELLHEIGHT + 2)))
+        # print("\n")  
+        # print(one_hot_3d_map)
+        # print("\n")
+        # print(one_hot_4d_map)
+        # print("\n")
+
 
 def num_to_action(num):
     if num == 0:

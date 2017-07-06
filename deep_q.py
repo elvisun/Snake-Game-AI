@@ -5,10 +5,12 @@ from collections import deque
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Dropout, Flatten, Conv2D, MaxPooling2D
 from keras.optimizers import Adam
+import matplotlib.pyplot as plt
+from keras import backend as K
 
 import game
 
-EPISODES = 5000
+EPISODES = 50
 
 
 class DQNAgent:
@@ -26,7 +28,8 @@ class DQNAgent:
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
         model = Sequential()
-        model.add(Conv2D(512, kernel_size = (2,2), activation='relu', input_shape=(1, self.state_size.shape[0], self.state_size.shape[1]), padding="same"))
+        model.add(Conv2D(512, kernel_size = (2,2), activation='relu', input_shape=(self.state_size.shape[0], self.state_size.shape[1], 4), padding="same"))
+        #model.add(Dense(512, input_dim=(self.state_size.shape[0] * self.state_size.shape[1], 4), activation='relu'))
         model.add(Flatten())
         model.add(Dropout(0.5))
         model.add(Dense(128, activation='relu'))
@@ -74,23 +77,30 @@ if __name__ == "__main__":
     #agent.load("./snake-cnn-weights.h5")
     done = False
     batch_size = 32
-
+    stepList = []
+    scoreList = []
     for e in range(EPISODES):
         state = env.reset()
         #print(state)
-        for time in range(500):
-            # env.render()
+        for step in range(500):
+            #env.render()
             action = agent.act(state)
             next_state, reward, done, score = env.move(action)
             reward = reward
             agent.remember(state, action, reward, next_state, done)
             state = next_state
             if done:
-                print("episode: {}/{}, score: {} steps {}, e: {:.2}"
-                      .format(e, EPISODES, time, score, agent.epsilon))
+                #print(game.num_to_action(action))
+                print("episode: {}/{}, steps: {} score {}, e: {:.2}"
+                      .format(e, EPISODES, step, score, agent.epsilon))
+                stepList.append(step)
+                scoreList.append(score)
                 break
         if len(agent.memory) > batch_size:
             agent.replay(batch_size)
         if e % 10 == 0:
             agent.save("./snake-cnn-weights.h5")
     agent.save("./snake-cnn-weights.h5")
+    plt.plot(stepList)
+    plt.title("num of steps")
+    plt.show()
