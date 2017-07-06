@@ -1,6 +1,7 @@
 # CNN Deep Reinforcement Learning Snake AI 
 # By Elvis Sun
 
+import numpy as np
 import random, pygame, sys, operator, os, time, argparse
 from pygame.locals import *
 
@@ -62,6 +63,16 @@ def main():
 
 class Game():
     def __init__(self):
+        self.observation_space = np.zeros((CELLWIDTH,CELLHEIGHT))
+        self.action_space = 4
+
+    def __getattr__(self, name):
+        if hasattr(self.st, name):
+            return getattr(self.st, name)
+        else:
+            raise AttributeError
+
+    def reset(self):
         self.head = {'x': 0, 'y': 0}
         self.gameOver = False
         self.direction = RIGHT
@@ -73,14 +84,17 @@ class Game():
                       {'x': startx + 1, 'y': starty},
                       ]
         self.apple = getRandomLocation(self.wormCoords)
-    
+        return self.get_state_map()
+
+
     def get_state(self):    
         return (self.wormCoords, self.apple)
 
     def move(self, action):
+        action = num_to_action(action)
         assert not self.gameOver, "Game over!"
         appleReward = 10
-        deathReward = -10
+        deathReward = -50
         moveReward = -0.2
         reward = 0
         wormCoords = self.wormCoords
@@ -94,16 +108,17 @@ class Game():
             if wormBody['x'] == wormCoords[HEAD]['x'] and wormBody['y'] == wormCoords[HEAD]['y']:
                 self.gameOver = True
                 reward = deathReward
-
-        if wormCoords[HEAD]['x'] == apple['x'] and wormCoords[HEAD]['y'] == apple['y']:
-            self.apple = getRandomLocation(wormCoords) # set a new apple somewhere
-            reward = appleReward
-        else:
-            del wormCoords[-1] # remove worm's tail segment
-            reward = moveReward
+        if not self.gameOver:
+            if wormCoords[HEAD]['x'] == apple['x'] and wormCoords[HEAD]['y'] == apple['y']:
+                self.apple = getRandomLocation(wormCoords) # set a new apple somewhere
+                reward = appleReward
+            else:
+                self.wormCoords.pop() # remove worm's tail segment
+                reward = moveReward
+        #print("new head {}".format(newHead))
         self.wormCoords.insert(0, newHead)
         self.score = self.score + reward
-        return reward
+        return (self.get_state_map(),reward,self.gameOver,self.score)
 
     def is_terminal(self):
         return self.gameOver
@@ -113,13 +128,25 @@ class Game():
 
     def get_state_map(self):
         stateMap = [[0 for i in range(CELLWIDTH)] for j in range(CELLHEIGHT)]
-        for i, cell in enumerate(wormCoords):
+        for i, cell in enumerate(self.wormCoords):
+            print(cell)  #this goes to 10
             stateMap[cell['y']][cell['x']] = 1
             #mark head as 2
-            if i == len(wormCoords):
+            if i == len(self.wormCoords):
                 stateMap[cell['y']][cell['x']] = 2
         stateMap[self.apple['y']][self.apple['x']] = 3
-        return stateMap
+        return np.array(stateMap).reshape(1,1,self.observation_space.shape[0],self.observation_space.shape[1])
+
+def num_to_action(num):
+    if num == 0:
+        return UP
+    elif num == 1:
+        return DOWN
+    elif num == 2:
+        return LEFT
+    elif num == 3:
+        return RIGHT
+    assert False, "Wrong action number"
 
 def updateDisplay(game):
     for event in pygame.event.get(): # event handling loop
@@ -161,6 +188,7 @@ def oppositeDirection(direction):
         return LEFT
 
 def findNewHead(direction,wormCoords):
+    newHead = {}
     if direction == UP:
         newHead = {'x': wormCoords[HEAD]['x'], 'y': wormCoords[HEAD]['y'] - 1}
     elif direction == DOWN:
