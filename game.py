@@ -152,9 +152,9 @@ class Game():
         stateMap[self.apple['y'] + 1][self.apple['x'] + 1] = 3
         categorical_2d_map = np.array(stateMap)
 
-        one_hot_3d_map = keras.utils.to_categorical(categorical_2d_map.reshape((CELLWIDTH + 2) * (CELLHEIGHT + 2)), num_classes = 4)
-        one_hot_4d_map = one_hot_3d_map.reshape(1,CELLWIDTH+2,CELLHEIGHT+2,4)
-        return one_hot_4d_map
+        one_hot_map = keras.utils.to_categorical(categorical_2d_map.reshape((CELLWIDTH + 2) * (CELLHEIGHT + 2)), num_classes = 4)
+        #print(one_hot_map)
+        return one_hot_map
         # print(categorical_2d_map)
         # print("\n")        
         # print(categorical_2d_map.reshape(1,(CELLWIDTH + 2) * (CELLHEIGHT + 2)))

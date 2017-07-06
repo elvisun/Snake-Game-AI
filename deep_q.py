@@ -10,7 +10,7 @@ from keras import backend as K
 
 import game
 
-EPISODES = 50
+EPISODES = 500
 
 
 class DQNAgent:
@@ -19,7 +19,7 @@ class DQNAgent:
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
         self.gamma = 0.99    # discount rate
-        self.epsilon = 1.0  # exploration rate
+        self.epsilon = 0.0#1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
         self.learning_rate = 0.001
@@ -28,9 +28,9 @@ class DQNAgent:
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
         model = Sequential()
-        model.add(Conv2D(512, kernel_size = (2,2), activation='relu', input_shape=(self.state_size.shape[0], self.state_size.shape[1], 4), padding="same"))
-        #model.add(Dense(512, input_dim=(self.state_size.shape[0] * self.state_size.shape[1], 4), activation='relu'))
-        model.add(Flatten())
+        #model.add(Conv2D(512, kernel_size = (2,2), activation='relu', input_shape=(self.state_size.shape[0], self.state_size.shape[1], 4), padding="same"))
+        model.add(Dense(512, input_shape= (5, self.state_size.shape[0] * self.state_size.shape[1], 4), activation='relu'))
+        #model.add(Flatten())
         model.add(Dropout(0.5))
         model.add(Dense(128, activation='relu'))
         model.add(Dropout(0.5))
@@ -69,12 +69,23 @@ class DQNAgent:
         self.model.save_weights(name)
 
 
+def compile_input(recentStates):
+    ret = []
+    if len(recentStates) < 5:
+        ret = [recentStates[0]] * (5 - len(recentStates)) + recentStates
+    else:
+        ret = recentStates
+    a = np.array(ret)
+    #print(a.shape)
+    return (np.expand_dims(a,axis=0))
+
+
 if __name__ == "__main__":
     env = game.Game()
     state_size = env.observation_space
     action_size = env.action_space
     agent = DQNAgent(state_size, action_size)
-    #agent.load("./snake-cnn-weights.h5")
+    agent.load("./snake-cnn-weights.h5")
     done = False
     batch_size = 32
     stepList = []
@@ -82,13 +93,24 @@ if __name__ == "__main__":
     for e in range(EPISODES):
         state = env.reset()
         #print(state)
+        recentStates = [state]
         for step in range(500):
-            #env.render()
-            action = agent.act(state)
+            env.render()
+            inputStates = compile_input(recentStates)
+            action = agent.act(inputStates)
             next_state, reward, done, score = env.move(action)
             reward = reward
-            agent.remember(state, action, reward, next_state, done)
-            state = next_state
+
+            #keep track of 5 recent states
+            if len(recentStates) >=5:
+                recentStates.pop(0)
+            recentStates.append(next_state)
+
+            next_input_state = compile_input(recentStates)
+            #print(next_input_state.shape)
+            agent.remember(inputStates, action, reward, next_input_state, done)
+
+
             if done:
                 #print(game.num_to_action(action))
                 print("episode: {}/{}, steps: {} score {}, e: {:.2}"
