@@ -6,10 +6,10 @@ import random, pygame, sys, operator, os, time, argparse
 import keras.utils
 from pygame.locals import *
 
-FPS = 10
+FPS = 60
 
-CELLWIDTH = 10
-CELLHEIGHT = 10
+CELLWIDTH = 5
+CELLHEIGHT = 5
 CELLSIZE = 50
 WINDOWWIDTH = CELLWIDTH * CELLSIZE
 WINDOWHEIGHT = CELLHEIGHT * CELLSIZE
@@ -107,9 +107,9 @@ class Game():
     def move(self, action):
         action = num_to_action(action)
         assert not self.gameOver, "Game over!"
-        appleReward = 10
+        appleReward = 50
         deathReward = -50
-        moveReward = 1
+        moveReward = 10
         reward = 0
         apple = self.apple
         newHead = findNewHead(action, self.wormCoords)
@@ -132,6 +132,7 @@ class Game():
                 self.wormCoords.pop() # remove worm's tail segment
                 reward = moveReward
         self.score = self.score + reward
+        #print(reward,self.gameOver,self.score)
         return (self.get_state_map(),reward,self.gameOver,self.score)
 
     def is_terminal(self):
@@ -141,21 +142,33 @@ class Game():
         return self.score
 
     def get_state_map(self):
+        #return pygame.surfarray.array3d(pygame.display.get_surface())
+
         stateMap = [[0 for i in range(CELLWIDTH + 2)] for j in range(CELLHEIGHT + 2)]
-        #print("\n \n")
+        #label walls as 4
+        for i, row in enumerate(stateMap):
+          for j, cell in enumerate(row):
+            if i==0 or i==(CELLWIDTH+1) or j==0 or j==(CELLHEIGHT+1):
+              stateMap[i][j] = 1
         for i, cell in enumerate(self.wormCoords):
             #print(cell)  #this goes to 10
-            stateMap[cell['y'] + 1][cell['x'] + 1] = 1
+            #mark worm body as 1
+            stateMap[cell['y'] + 1][cell['x'] + 1] = 2
             #mark head as 2
             if i == 0:
-                stateMap[cell['y'] + 1][cell['x'] + 1] = 2
-        stateMap[self.apple['y'] + 1][self.apple['x'] + 1] = 3
-        categorical_2d_map = np.array(stateMap)
-
-        one_hot_3d_map = keras.utils.to_categorical(categorical_2d_map.reshape((CELLWIDTH + 2) * (CELLHEIGHT + 2)), num_classes = 4)
-        one_hot_4d_map = one_hot_3d_map.reshape(1,CELLWIDTH+2,CELLHEIGHT+2,4)
-        return one_hot_4d_map
-        # print(categorical_2d_map)
+                stateMap[cell['y'] + 1][cell['x'] + 1] = 3
+        #mark apple as 3
+        stateMap[self.apple['y'] + 1][self.apple['x'] + 1] = 4
+        
+        categorical_2d_map = keras.utils.to_categorical(np.array(stateMap), num_classes = 5)
+        categorical_2d_map_for_conv2D = np.array(stateMap).reshape(1,CELLWIDTH+2,CELLHEIGHT+2,1)
+        
+        #one_hot_3d_map = keras.utils.to_categorical(categorical_2d_map.reshape((CELLWIDTH + 2) * (CELLHEIGHT + 2)), num_classes = 5)
+        #one_hot_4d_map = one_hot_3d_map.reshape(1,CELLWIDTH+2,CELLHEIGHT+2,5)
+        #print(categorical_2d_map.shape)
+        #print(categorical_2d_map)
+        return categorical_2d_map
+        # 
         # print("\n")        
         # print(categorical_2d_map.reshape(1,(CELLWIDTH + 2) * (CELLHEIGHT + 2)))
         # print("\n")  
